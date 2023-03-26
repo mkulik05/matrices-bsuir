@@ -2,12 +2,25 @@
 use rand::Rng;
 use std::{time::{Duration, Instant}, primitive};
 
-const VALUES_RANGE: (i32, i32) = (-10, 10);
-const BASE_CASE: usize = 8;
+const VALUES_RANGE: (i32, i32) = (1, 10);
+const BASE_CASE: usize = 1;
 
 struct Matrix {
     els: Vec<i32>,
     size: (usize, usize)
+}
+
+struct OperationCount {
+    muls: u32,
+    sums: u32,
+    sums0: u32,
+    muls0: u32
+}
+
+impl OperationCount {
+    fn add(&self, other: &OperationCount) -> Self {
+        OperationCount{muls: self.muls + other.muls, sums: self.sums + other.sums, sums0: self.sums0 + other.sums0, muls0: self.muls0 + other.muls0}
+    }
 }
 
 impl Matrix {
@@ -32,41 +45,74 @@ impl Matrix {
     fn set_el(&mut self, x: usize, y: usize, value: i32) {
         self.els[y * self.size.0 + x ] = value;
     }
-    fn multiply(&self, m: &Matrix) -> Matrix {
+    fn multiply(&self, m: &Matrix) -> (Matrix, OperationCount) {
+        let mut sums = 0;
+        let mut muls = 0;
+        let mut sums0 = 0;
+        let mut muls0 = 0;
         let n = self.size.0;
         let mut res =  Matrix::zero_filled(n);
         for i in 0..n {
             for k in 0..n {
                 for j in 0..m.size.1 {
+                    if res.get_el(i, j) == 0 || self.get_el(i, k) * m.get_el(k, j) == 0 {
+                        sums0 += 1;
+                    } else {
+                        sums += 1;
+                    }
+                    if self.get_el(i, k) == 0 || m.get_el(k, j) == 0 {
+                        muls0 += 1;
+                    } else {
+                        muls += 1;
+                    }
                     res.set_el(i, j, res.get_el(i, j) + self.get_el(i, k) * m.get_el(k, j))
                 }
             }
         }
-        res
+        (res, OperationCount{sums, sums0, muls, muls0})
     }
-    fn add(&self, m: &Matrix) -> Matrix {
+
+    fn add(&self, m: &Matrix) -> (Matrix, OperationCount) {
+        let mut sums = 0;
+        let muls = 0;
+        let mut sums0 = 0;
+        let muls0 = 0;
         let n = self.size.0;
         let mut res =  Matrix::zero_filled(n);
         for i in 0..n {
             for j in 0..n {
+                if self.get_el(i, j)== 0 || m.get_el(i, j) == 0 {
+                    sums0 += 1;
+                } else {
+                    sums += 1;
+                }
                 res.set_el(i, j, self.get_el(i, j) + m.get_el(i, j))
             }
         }
-        res
+        (res, OperationCount{sums, sums0, muls0, muls})
     }
 
-    fn sub(&self, m: &Matrix) -> Matrix {
+    fn sub(&self, m: &Matrix) -> (Matrix, OperationCount) {
+        let mut sums = 0;
+        let muls = 0;
+        let mut sums0 = 0;
+        let muls0 = 0;
         let n = self.size.0;
         let mut res =  Matrix::zero_filled(n);
         for i in 0..n {
             for j in 0..n {
+                if self.get_el(i, j)== 0 || m.get_el(i, j) == 0 {
+                    sums0 += 1;
+                } else {
+                    sums += 1;
+                }
                 res.set_el(i, j, self.get_el(i, j) - m.get_el(i, j))
             }
         }
-        res
+        (res, OperationCount{sums, sums0, muls0, muls})
     }
 
-    fn strassen_recursion(&self, m: &Matrix) -> Matrix {
+    fn strassen_recursion(&self, m: &Matrix) -> (Matrix, OperationCount) {
         let n = self.size.0;
         if n <= BASE_CASE {
             return self.multiply(m)
@@ -98,41 +144,67 @@ impl Matrix {
                     b22.set_el(i, j, m.get_el(i + new_n, j + new_n));
                 }
             }
+            let mut ops = OperationCount{sums: 0, sums0:0, muls: 0, muls0:0};
+            let mut ops1;
+            (a_res, ops1) = a11.add(&a22);
+            ops = ops.add(&ops1);
+            (b_res, ops1) = b11.add(&b22);
+            ops = ops.add(&ops1);
+            let (p1, mut ops1) = a_res.strassen_recursion(&b_res);
+            ops = ops.add(&ops1);
 
-            a_res = a11.add(&a22);
-            b_res = b11.add(&b22);
-            let p1 = a_res.strassen_recursion(&b_res);
+            (a_res, ops1) = a21.add(&a22);
+            ops = ops.add(&ops1);
+            let (p2, mut ops1) = a_res.strassen_recursion(&b11);
+            ops = ops.add(&ops1);
 
-            a_res = a21.add(&a22);
-            let p2 = a_res.strassen_recursion(&b11);
+            (b_res, ops1) = b12.sub(&b22);
+            ops = ops.add(&ops1);
+            let (p3, mut ops1) = a11.strassen_recursion(&b_res);
+            ops = ops.add(&ops1);
 
-            b_res = b12.sub(&b22);
-            let p3 = a11.strassen_recursion(&b_res);
+            (b_res, ops1) = b21.sub(&b11);
+            ops = ops.add(&ops1);
+            let (p4, mut ops1) = a22.strassen_recursion(&b_res);
+            ops = ops.add(&ops1);
 
-            b_res = b21.sub(&b11);
-            let p4 = a22.strassen_recursion(&b_res);
+            (a_res, ops1) = a11.add(&a12);
+            ops = ops.add(&ops1);
+            let (p5, mut ops1) = a_res.strassen_recursion(&b22);
+            ops = ops.add(&ops1);
 
-            a_res = a11.add(&a12);
-            let p5 = a_res.strassen_recursion(&b22);
+            (a_res, ops1) = a21.sub(&a11);
+            ops = ops.add(&ops1);
+            (b_res, ops1) = b11.add(&b12);
+            ops = ops.add(&ops1);
+            let (p6, mut ops1) = a_res.strassen_recursion(&b_res);
+            ops = ops.add(&ops1);
 
-            a_res = a21.sub(&a11);
-            b_res = b11.add(&b12);
-            let p6 = a_res.strassen_recursion(&b_res);
+            (a_res, ops1) = a12.sub(&a22);
+            ops = ops.add(&ops1);
+            (b_res, ops1) = b21.add(&b22);
+            ops = ops.add(&ops1);
+            let (p7, mut ops1) = a_res.strassen_recursion(&b_res);
+            ops = ops.add(&ops1);
 
-            a_res = a12.sub(&a22);
-            b_res = b21.add(&b22);
-            let p7 = a_res.strassen_recursion(&b_res);
+            let (c12, mut ops1) = p3.add(&p5);
+            ops = ops.add(&ops1);
+            let (c21, mut ops1) = p2.add(&p4);
+            ops = ops.add(&ops1);
 
-            let c12 = p3.add(&p5);
-            let c21 = p2.add(&p4);
+            (a_res, ops1) = p1.add(&p4);
+            ops = ops.add(&ops1);
+            (b_res, ops1) = a_res.add(&p7);
+            ops = ops.add(&ops1);
+            let (c11, mut ops1) = b_res.sub(&p5);
+            ops = ops.add(&ops1);
 
-            a_res = p1.add(&p4);
-            b_res = a_res.add(&p7);
-            let c11 = b_res.sub(&p5);
-
-            a_res = p1.add(&p3);
-            b_res = a_res.add(&p6);
-            let c22 = b_res.sub(&p2);
+            (a_res, ops1) = p1.add(&p3);
+            ops = ops.add(&ops1);
+            (b_res, ops1) = a_res.add(&p6);
+            ops = ops.add(&ops1);
+            let (c22, ops1) = b_res.sub(&p2);
+            ops = ops.add(&ops1);
 
             let mut c = Matrix::zero_filled(n);
             for i in 0..new_n {
@@ -144,11 +216,11 @@ impl Matrix {
                 }
             }
 
-            return c
+            return (c, ops)
         }
     }
 
-    fn multiply_strassen (&self, m: &Matrix) -> Matrix {
+    fn multiply_strassen (&self, m: &Matrix) -> (Matrix, OperationCount) {
         let n = self.size.0;
         let power_base: i32 = 2;
         let new_n = power_base.pow((n as f32).log2().ceil() as u32);
@@ -160,7 +232,7 @@ impl Matrix {
                 b_prep.set_el(i, j, m.get_el(i, j));
             }
         }
-        let c_prep = a_prep.strassen_recursion(&b_prep);
+        let (c_prep, ops) = a_prep.strassen_recursion(&b_prep);
         let mut c = Matrix::zero_filled(n);
         for i in 0..n {
             for j in 0..n { 
@@ -168,7 +240,7 @@ impl Matrix {
             }
         }
         
-        c
+        (c, ops)
 
     }
 
@@ -203,30 +275,19 @@ impl std::fmt::Display for Matrix {
 
 fn main() {
 
-    let run_times1 = 10;
-    let run_times2 = 1;
-    let mut n = 611;
+    let mut n = 1;
     while n < 1500 {
         let m1 = Matrix::new(n);
         let m2 = Matrix::new(n);
 
-        let start = Instant::now();
-        for _i in 0..run_times1 {
-            let _res = m1.multiply(&m2);
-        }
-        let duration = start.elapsed();
-        let formatted = format!("loops;{n};{}", duration.as_secs_f64() / (run_times1 as f64)).replace(".", ",");
-        println!("{}", formatted);
 
+        let (res1, ops1) = m1.multiply(&m2);
+        println!("loops;{n};{};{};{};{}", ops1.muls, ops1.muls0, ops1.sums, ops1.sums0);
 
-        let start = Instant::now();
-        for _i in 0..run_times2 {
-            let _res = m1.multiply_strassen(&m2);
-        }
-        let duration = start.elapsed();
-        let formatted = format!("strassen;{n};{}", duration.as_secs_f64() / (run_times2 as f64)).replace(".", ",");
-        println!("{}", formatted);
+        let (res2, ops2) = m1.multiply_strassen(&m2);
+        println!("strassen;{n};{};{};{};{}", ops2.muls, ops2.muls0, ops2.sums, ops2.sums0);
 
+        assert!(res1.is_equal(&res2));
 
 
         if n > 400 {
