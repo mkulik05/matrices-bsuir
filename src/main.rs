@@ -3,7 +3,7 @@ use rand::Rng;
 use std::{time::{Duration, Instant}, primitive};
 
 const VALUES_RANGE: (i32, i32) = (1, 10);
-const BASE_CASE: usize = 1;
+const BASE_CASE: usize = 64;
 
 struct Matrix {
     els: Vec<i32>,
