@@ -3,7 +3,7 @@ use rand::Rng;
 use std::{time::{Duration, Instant}, primitive};
 
 const VALUES_RANGE: (i32, i32) = (1, 10);
-const BASE_CASE: usize = 64;
+const BASE_CASE: usize = 2;
 
 struct Matrix {
     els: Vec<i32>,
@@ -55,11 +55,12 @@ impl Matrix {
         for i in 0..n {
             for k in 0..n {
                 for j in 0..m.size.1 {
-                    if res.get_el(i, j) == 0 || self.get_el(i, k) * m.get_el(k, j) == 0 {
-                        sums0 += 1;
-                    } else {
-                        sums += 1;
-                    }
+                    // if res.get_el(i, j) == 0 || self.get_el(i, k) * m.get_el(k, j) == 0 {
+                    //     // sums += 1;
+                    // } else {
+                    //     sums += 1;
+                    // }
+                    sums += 1;
                     if self.get_el(i, k) == 0 || m.get_el(k, j) == 0 {
                         muls0 += 1;
                     } else {
@@ -69,6 +70,7 @@ impl Matrix {
                 }
             }
         }
+        sums -= (n*n) as u32;
         (res, OperationCount{sums, sums0, muls, muls0})
     }
 
@@ -101,7 +103,7 @@ impl Matrix {
         let mut res =  Matrix::zero_filled(n);
         for i in 0..n {
             for j in 0..n {
-                if self.get_el(i, j)== 0 || m.get_el(i, j) == 0 {
+                if self.get_el(i, j) == 0 || m.get_el(i, j) == 0 {
                     sums0 += 1;
                 } else {
                     sums += 1;
