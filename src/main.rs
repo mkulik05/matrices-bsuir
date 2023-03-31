@@ -1,10 +1,8 @@
 
 use num_bigint::BigInt;
 use num_bigint::{ToBigInt, RandBigInt};
-use num_traits::{Zero, One};
-use rand::Rng;
-use std::collections::btree_map::Values;
-use std::{time::{Duration, Instant}, primitive};
+use num_traits::{Zero};
+use std::{time::Instant};
 
 struct Matrix {
     els: Vec<Box<BigInt>>,
@@ -12,11 +10,11 @@ struct Matrix {
 }
 
 impl Matrix {
-    fn new(n: usize, VALUES_RANGE: &(BigInt, BigInt)) -> Self {
+    fn new(n: usize, values_range: &(BigInt, BigInt)) -> Self {
         let mut els = Vec::new();
         let mut rng = rand::thread_rng();
         for _i in 0..(n*n) { 
-            let v = rng.gen_bigint_range(&VALUES_RANGE.0, &VALUES_RANGE.1);
+            let v = rng.gen_bigint_range(&values_range.0, &values_range.1);
             // println!("{}", v);
             els.push(Box::new(v))
         }
@@ -85,8 +83,7 @@ impl Matrix {
             let mut b21 = Matrix::zero_filled(new_n);
             let mut b22 = Matrix::zero_filled(new_n);
 
-            let mut a_res = Matrix::zero_filled(new_n);
-            let mut b_res = Matrix::zero_filled(new_n);
+
 
             for i in 0..new_n {
                 for j in 0..new_n { 
@@ -102,8 +99,8 @@ impl Matrix {
                 }
             }
 
-            a_res = a11.add(&a22);
-            b_res = b11.add(&b22);
+            let mut a_res = a11.add(&a22);
+            let mut b_res = b11.add(&b22);
             let p1 = a_res.strassen_recursion(&b_res, base_case);
 
             a_res = a21.add(&a22);
@@ -190,19 +187,19 @@ impl Matrix {
     }
 }
 
-// impl std::fmt::Display for Matrix { 
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let mut output = String::new();
-//         for i in 0..self.size.0 {
-//             for j in 0..self.size.1 {
-//                 let value = self.get_el(i, j);
-//                 output.push_str(&format!("{:5}", value));
-//             }
-//             output.push('\n');
-//         }
-//         write!(f, "{}", output)
-//     }
-// }
+impl std::fmt::Display for Matrix { 
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut output = String::new();
+        for i in 0..self.size.0 {
+            for j in 0..self.size.1 {
+                let value = *self.get_el(i, j);
+                output.push_str(&format!("{:5}", value));
+            }
+            output.push('\n');
+        }
+        write!(f, "{}", output)
+    }
+}
 
 fn bench_mul(m1: &Matrix, m2: &Matrix, min_time: f64, min_run_times: i32) -> f64 {
     let start = Instant::now();
@@ -213,7 +210,7 @@ fn bench_mul(m1: &Matrix, m2: &Matrix, min_time: f64, min_run_times: i32) -> f64
     let mut n = 0;
     if duration.as_secs_f64() < min_time {
         let start = Instant::now();
-        for i in 0..((min_time / duration.as_secs_f64() + 1.0) as i32) {
+        for _ in 0..((min_time / duration.as_secs_f64() + 1.0) as i32) {
             let _res = m1.multiply(&m2);
             n += 1;
         }
@@ -233,7 +230,7 @@ fn bench_strassen(m1: &Matrix, m2: &Matrix, min_time: f64, min_run_times: i32, b
     let mut n = 0;
     if duration.as_secs_f64() < min_time {
         let start = Instant::now();
-        for i in 0..((min_time / duration.as_secs_f64() + 1.0) as i32) {
+        for _ in 0..((min_time / duration.as_secs_f64() + 1.0) as i32) {
             let _res = m1.multiply_strassen(&m2, base_case);
             n += 1;
         }
@@ -245,7 +242,7 @@ fn bench_strassen(m1: &Matrix, m2: &Matrix, min_time: f64, min_run_times: i32, b
 }
 
 fn main() {
-    let values_range: (BigInt, BigInt) = ((-10000000000000000000000000000 as i128).to_bigint().unwrap(), (100000000000000000000000000000 as i128).to_bigint().unwrap());
+    let values_range: (BigInt, BigInt) = (BigInt::parse_bytes(b"10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", 10).unwrap(), BigInt::parse_bytes(b"100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", 10).unwrap());
     let base_case = 1;
     let min_run_times1 = 2;
     let min_run_times2 = 2;
@@ -254,7 +251,6 @@ fn main() {
     while n < 3500 {
         let m1 = Matrix::new(n, &values_range);
         let m2 = Matrix::new(n, &values_range);
-
         let t1 = bench_mul(&m1, &m2, min_time, min_run_times1);
         let formatted = format!("loops;{n};{}", t1).replace(".", ",");
         println!("{}", formatted);
